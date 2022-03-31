@@ -1,36 +1,27 @@
-import FlowTreeBuilder, {
-    createFlowTreeModifier as createFlowTreeModifierFromBuilder,
+(function () {
+    const worker = new Worker('./worker.js'),
+        svgImage = document.getElementById('svgImage'),
+        downloadFile = document.getElementById('downloadFile'),
+        codeEditor = CodeMirror.fromTextArea(document.getElementById('codeEditor'), {
+            lineNumbers: true,
+            mode:  'javascript',
+            theme: 'elegant'
+        });
 
-    ABSTRACTION_LEVELS,
-    MODIFIER_PRESETS,
-    DEFINED_MODIFIERS
-} from 'builder/FlowTreeBuilder';
-import SVGRender, { ShapesTreeEditor } from 'render/svg/SVGRender';
-import PresentationGenerator from 'presentation-generator/PresentationGenerator';
-import { TOKEN_TYPES, MODIFIED_TYPES } from 'shared/constants';
+    codeEditor.on('change', _.debounce(() => {
+        worker.postMessage({ code: codeEditor.getValue() });
+    }), 500);
 
-export const createFlowTreeBuilder = FlowTreeBuilder;
-export const createFlowTreeModifier = createFlowTreeModifierFromBuilder;
+    downloadFile.addEventListener('click', ()=> {
+        const fileName = `flowchart_${(new Date().toString()).replace(/ /g,'_')}.svg`,
+            file = new File([svgImage.innerHTML], fileName, {type: 'image/svg+xml;charset=utf-8'});
 
-export const createSVGRender = SVGRender;
-export const createShapesTreeEditor = ShapesTreeEditor;
+        window.saveAs(file, fileName);
+    });
 
-export const createPresentationGenerator = PresentationGenerator;
+    worker.onmessage = function(message) {
+        svgImage.innerHTML = message.data.svg;
+    };
 
-export { ABSTRACTION_LEVELS, DEFINED_MODIFIERS, MODIFIER_PRESETS, TOKEN_TYPES, MODIFIED_TYPES };
-
-export const convertCodeToSvg = (code, printConfig) => convertFlowTreeToSvg(convertCodeToFlowTree(code), printConfig);
-
-export const convertCodeToFlowTree = (code) => {
-    const flowTreeBuilder = createFlowTreeBuilder();
-
-    return flowTreeBuilder.build(code);
-};
-
-export const convertFlowTreeToSvg = (flowTree, printConfig) => {
-    const svgRender = createSVGRender();
-
-    const shapesTree = svgRender.buildShapesTree(flowTree);
-
-    return shapesTree.print(printConfig);
-};
+    worker.postMessage({ code: codeEditor.getValue() });
+})();
